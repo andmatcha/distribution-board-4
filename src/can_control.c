@@ -9,6 +9,14 @@
 static CAN_HandleTypeDef *hcan_ctrl = NULL;
 static TIM_HandleTypeDef *htim_ctrl = NULL;
 
+// サーボモーター現在角度 (angle_x10単位: 0〜2700)
+static uint16_t servo_current_angle = 1350;  // 初期値135度
+
+// サーボモーター角度変化量 (angle_x10単位)
+// サーボ速度: 0.14秒で60度 → 428.6度/秒
+// CAN受信間隔: 0.01秒 → 4.29度/受信 ≒ 4度
+#define SERVO_ANGLE_STEP  40  // 4度 (angle_x10単位)
+
 // CANフィルター設定用
 static void can_filter_config(void);
 
@@ -48,7 +56,6 @@ static void can_filter_config(void) {
 
 void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
   led_set(LED_COLOR_YELLOW, LED_STATE_ON);
-  printf("CAN RX Callback invoked\n");
   CAN_RxHeaderTypeDef rx_header;
   uint8_t rx_data[8];
 
@@ -83,13 +90,28 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
       }
 
       // サーボモーター制御 (rx_data[2])
-      // 0: 270度, 1: 停止(現在位置保持), 2: 0度, それ以外: 無視
+      // 0: 角度を増やす(270度方向), 1: 停止(現在位置保持), 2: 角度を減らす(0度方向)
       if (rx_data[2] == 0) {
-        servo_set_angle(2700);  // 270度
-        printf("Servo: 270 deg\n");
+        // 角度を増やす（270度方向へ）
+        if (servo_current_angle < 2700) {
+          servo_current_angle += SERVO_ANGLE_STEP;
+          if (servo_current_angle > 2700) {
+            servo_current_angle = 2700;  // 上限リミット
+          }
+          servo_set_angle(servo_current_angle);
+          printf("Servo: %u.%u deg (increasing)\n", servo_current_angle / 10, servo_current_angle % 10);
+        }
       } else if (rx_data[2] == 2) {
-        servo_set_angle(0);     // 0度
-        printf("Servo: 0 deg\n");
+        // 角度を減らす（0度方向へ）
+        if (servo_current_angle > 0) {
+          if (servo_current_angle >= SERVO_ANGLE_STEP) {
+            servo_current_angle -= SERVO_ANGLE_STEP;
+          } else {
+            servo_current_angle = 0;  // 下限リミット
+          }
+          servo_set_angle(servo_current_angle);
+          printf("Servo: %u.%u deg (decreasing)\n", servo_current_angle / 10, servo_current_angle % 10);
+        }
       }
       // rx_data[2] == 1 の場合は何もしない（現在位置保持）
     }
