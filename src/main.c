@@ -119,6 +119,21 @@ int main(void)
 
   // CAN受信制御初期化
   can_control_init(&hcan, &htim3);
+
+  // 全初期化完了後のTIM3レジスタ確認
+  printf("\n[MAIN] === TIM3 Registers after ALL initializations ===\n");
+  printf("[MAIN] TIM3 CR1:   0x%04X (bit0=1 for counter enable)\n", htim3.Instance->CR1);
+  printf("[MAIN] TIM3 CCER:  0x%04X (bit0=CH1, bit4=CH2, bit8=CH3 enable)\n", htim3.Instance->CCER);
+  printf("[MAIN] TIM3 CCMR1: 0x%04X (CH1/CH2 mode)\n", htim3.Instance->CCMR1);
+  printf("[MAIN] TIM3 CCMR2: 0x%04X (CH3/CH4 mode, bits4-6 should be 0b110 for CH3 PWM mode1)\n", htim3.Instance->CCMR2);
+  printf("[MAIN] TIM3 CCR1:  %lu\n", htim3.Instance->CCR1);
+  printf("[MAIN] TIM3 CCR2:  %lu\n", htim3.Instance->CCR2);
+  printf("[MAIN] TIM3 CCR3:  %lu\n", htim3.Instance->CCR3);
+  printf("[MAIN] TIM3 CNT:   %lu (should be counting if enabled)\n", htim3.Instance->CNT);
+  HAL_Delay(1);
+  printf("[MAIN] TIM3 CNT after 1ms: %lu (should be different if counting)\n", htim3.Instance->CNT);
+  printf("[MAIN] =========================================\n\n");
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -126,9 +141,20 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    // servo_set_angle(900);
-    // dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, 50);
+
     /* USER CODE BEGIN 3 */
+    // dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, 50);
+    // dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_FORWARD, 50);
+
+    // サーボモーター動作確認: 0度 → 135度 → 270度を繰り返し
+    servo_set_angle(0);
+    HAL_Delay(2000);  // 2秒待機
+
+    servo_set_angle(1350);
+    HAL_Delay(2000);  // 2秒待機
+
+    servo_set_angle(2700);
+    HAL_Delay(2000);  // 2秒待機
   }
   /* USER CODE END 3 */
 }

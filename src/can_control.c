@@ -91,27 +91,38 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
 
       // サーボモーター制御 (rx_data[2])
       // 0: 角度を増やす(270度方向), 1: 停止(現在位置保持), 2: 角度を減らす(0度方向)
+      // if (rx_data[2] == 0) {
+      //   // 角度を増やす（270度方向へ）
+      //   if (servo_current_angle < 2700) {
+      //     servo_current_angle += SERVO_ANGLE_STEP;
+      //     if (servo_current_angle > 2700) {
+      //       servo_current_angle = 2700;  // 上限リミット
+      //     }
+      //     servo_set_angle(servo_current_angle);
+      //     printf("Servo: %u.%u deg (increasing)\n", servo_current_angle / 10, servo_current_angle % 10);
+      //   }
+      // } else if (rx_data[2] == 2) {
+      //   // 角度を減らす（0度方向へ）
+      //   if (servo_current_angle > 0) {
+      //     if (servo_current_angle >= SERVO_ANGLE_STEP) {
+      //       servo_current_angle -= SERVO_ANGLE_STEP;
+      //     } else {
+      //       servo_current_angle = 0;  // 下限リミット
+      //     }
+      //     servo_set_angle(servo_current_angle);
+      //     printf("Servo: %u.%u deg (decreasing)\n", servo_current_angle / 10, servo_current_angle % 10);
+      //   }
+      // }
       if (rx_data[2] == 0) {
         // 角度を増やす（270度方向へ）
-        if (servo_current_angle < 2700) {
-          servo_current_angle += SERVO_ANGLE_STEP;
-          if (servo_current_angle > 2700) {
-            servo_current_angle = 2700;  // 上限リミット
-          }
-          servo_set_angle(servo_current_angle);
-          printf("Servo: %u.%u deg (increasing)\n", servo_current_angle / 10, servo_current_angle % 10);
-        }
+        printf("[CAN] Before calling servo_set_angle(2700)\n");
+        servo_set_angle(2700);
+        printf("[CAN] After calling servo_set_angle(2700)\n");
       } else if (rx_data[2] == 2) {
         // 角度を減らす（0度方向へ）
-        if (servo_current_angle > 0) {
-          if (servo_current_angle >= SERVO_ANGLE_STEP) {
-            servo_current_angle -= SERVO_ANGLE_STEP;
-          } else {
-            servo_current_angle = 0;  // 下限リミット
-          }
-          servo_set_angle(servo_current_angle);
-          printf("Servo: %u.%u deg (decreasing)\n", servo_current_angle / 10, servo_current_angle % 10);
-        }
+        printf("[CAN] Before calling servo_set_angle(0)\n");
+        servo_set_angle(0);
+        printf("[CAN] After calling servo_set_angle(0)\n");
       }
       // rx_data[2] == 1 の場合は何もしない（現在位置保持）
     }
