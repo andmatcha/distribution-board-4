@@ -63,7 +63,7 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
     // データ: [DCモーター1, DCモーター2, サーボモーター]
     if (rx_header.DLC >= 3) {
       // DCモーター1制御 (rx_data[0])
-      // 0: 逆転, 1: 正転, それ以外: 無視
+      // 0: 逆転(引っ込む), 1: 正転(出っ張る), それ以外: 無視
       if (rx_data[0] == 0) {
         dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, 50);
         printf("DC Motor 1: Reverse (50%%)\n");
@@ -73,7 +73,7 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
       }
 
       // DCモーター2制御 (rx_data[1])
-      // 0: 逆転, 1: 正転, それ以外: 無視
+      // 0: 逆転(引っ込む), 1: 正転(出っ張る), それ以外: 無視
       if (rx_data[1] == 0) {
         dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_REVERSE, 50);
         printf("DC Motor 2: Reverse (50%%)\n");

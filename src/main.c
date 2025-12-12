@@ -126,7 +126,8 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-
+    // servo_set_angle(900);
+    // dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, 50);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
