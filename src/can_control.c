@@ -2,6 +2,7 @@
 #include "can_control.h"
 #include "servo.h"
 #include "dc_motor.h"
+#include "led.h"
 #include <stdio.h>
 
 // CAN関連ハンドル
@@ -26,18 +27,17 @@ void can_control_init(CAN_HandleTypeDef *hcan, TIM_HandleTypeDef *htim) {
 static void can_filter_config(void) {
   CAN_FilterTypeDef filter_config;
 
-  // フィルター設定: ID 0x100〜0x102を受信
+  // フィルター設定: ID 0x208を受信
   // マスクモードでフィルタリング
-  // ID: 0x100 (0001 0000 0000)
-  // Mask: 0x7FC (0111 1111 1100) → 下位2ビット以外一致
-  // これにより0x100, 0x101, 0x102を受信
+  // ID: 0x208
+  // Mask: 0x7FF (完全一致)
 
   filter_config.FilterBank = 0;
   filter_config.FilterMode = CAN_FILTERMODE_IDMASK;
   filter_config.FilterScale = CAN_FILTERSCALE_32BIT;
-  filter_config.FilterIdHigh = (CAN_ID_SERVO << 5);  // 標準ID (11bit) を上位にシフト
+  filter_config.FilterIdHigh = (CAN_ID_CONTROL << 5);  // 標準ID (11bit) を上位にシフト
   filter_config.FilterIdLow = 0;
-  filter_config.FilterMaskIdHigh = (0x7FC << 5);     // マスク: 0x100〜0x103を許可
+  filter_config.FilterMaskIdHigh = (0x7FF << 5);       // マスク: 完全一致
   filter_config.FilterMaskIdLow = 0;
   filter_config.FilterFIFOAssignment = CAN_RX_FIFO0;
   filter_config.FilterActivation = ENABLE;
@@ -47,6 +47,8 @@ static void can_filter_config(void) {
 }
 
 void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
+  led_set(LED_COLOR_YELLOW, LED_STATE_ON);
+  printf("CAN RX Callback invoked\n");
   CAN_RxHeaderTypeDef rx_header;
   uint8_t rx_data[8];
 
@@ -55,46 +57,42 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
     return;
   }
 
-  // CAN受信情報を出力
-  printf("CAN RX | ID: 0x%03lX, DLC: %lu, Data: ", rx_header.StdId, rx_header.DLC);
-  for (uint8_t i = 0; i < rx_header.DLC; i++) {
-    printf("%02X ", rx_data[i]);
-  }
-  printf("\n");
-
   // 受信したCAN IDに応じて処理
-  switch (rx_header.StdId) {
-    case CAN_ID_SERVO:
-      // サーボモーター制御
-      // データ: [angle_high, angle_low]
-      if (rx_header.DLC >= 2) {
-        uint16_t angle_x10 = (rx_data[0] << 8) | rx_data[1];
-        servo_set_angle(angle_x10);
+  if (rx_header.StdId == CAN_ID_CONTROL) {
+    // CAN ID 0x208: モーター制御
+    // データ: [DCモーター1, DCモーター2, サーボモーター]
+    if (rx_header.DLC >= 3) {
+      // DCモーター1制御 (rx_data[0])
+      // 0: 逆転, 1: 正転, それ以外: 無視
+      if (rx_data[0] == 0) {
+        dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, 50);
+        printf("DC Motor 1: Reverse (50%%)\n");
+      } else if (rx_data[0] == 1) {
+        dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_FORWARD, 50);
+        printf("DC Motor 1: Forward (50%%)\n");
       }
-      break;
 
-    case CAN_ID_MOTOR1:
-      // DCモーター1制御
-      // データ: [direction, duty]
-      if (rx_header.DLC >= 2) {
-        DcMotorDirection direction = (DcMotorDirection)rx_data[0];
-        uint8_t duty = rx_data[1];
-        dc_motor_set(DC_MOTOR_1, direction, duty);
+      // DCモーター2制御 (rx_data[1])
+      // 0: 逆転, 1: 正転, それ以外: 無視
+      if (rx_data[1] == 0) {
+        dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_REVERSE, 50);
+        printf("DC Motor 2: Reverse (50%%)\n");
+      } else if (rx_data[1] == 1) {
+        dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_FORWARD, 50);
+        printf("DC Motor 2: Forward (50%%)\n");
       }
-      break;
 
-    case CAN_ID_MOTOR2:
-      // DCモーター2制御
-      // データ: [direction, duty]
-      if (rx_header.DLC >= 2) {
-        DcMotorDirection direction = (DcMotorDirection)rx_data[0];
-        uint8_t duty = rx_data[1];
-        dc_motor_set(DC_MOTOR_2, direction, duty);
+      // サーボモーター制御 (rx_data[2])
+      // 0: 270度, 1: 停止(現在位置保持), 2: 0度, それ以外: 無視
+      if (rx_data[2] == 0) {
+        servo_set_angle(2700);  // 270度
+        printf("Servo: 270 deg\n");
+      } else if (rx_data[2] == 2) {
+        servo_set_angle(0);     // 0度
+        printf("Servo: 0 deg\n");
       }
-      break;
-
-    default:
-      // 未知のID (通常はフィルタで除外されるが念のため)
-      break;
+      // rx_data[2] == 1 の場合は何もしない（現在位置保持）
+    }
   }
+  led_set(LED_COLOR_YELLOW, LED_STATE_OFF);
 }

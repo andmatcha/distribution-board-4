@@ -107,8 +107,8 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   // LED初期化確認
-  led_set(LED_COLOR_RED, LED_STATE_ON);
-  led_set(LED_COLOR_YELLOW, LED_STATE_ON);
+  led_set(LED_COLOR_RED, LED_STATE_OFF);
+  led_set(LED_COLOR_YELLOW, LED_STATE_OFF);
   led_set(LED_COLOR_GREEN, LED_STATE_ON);
 
   // サーボモーター初期化
@@ -128,10 +128,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // サーボモーター動作確認: 複数の角度を順番に指定
-
-    servo_set_angle(300);
-    printf("Servo: 30 deg\n");
   }
   /* USER CODE END 3 */
 }

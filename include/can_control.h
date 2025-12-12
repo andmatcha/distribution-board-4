@@ -5,9 +5,7 @@
 #include "stm32f1xx_hal.h"
 
 // CAN ID定義
-#define CAN_ID_SERVO     0x100  // サーボモーター制御用
-#define CAN_ID_MOTOR1    0x101  // DCモーター1制御用
-#define CAN_ID_MOTOR2    0x102  // DCモーター2制御用
+#define CAN_ID_CONTROL   0x208  // モーター制御用 (DCモーター1, DCモーター2, サーボモーター)
 
 /**
  * @brief CAN受信初期化
