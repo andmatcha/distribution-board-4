@@ -22,6 +22,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "led.h"
+#include "servo.h"
+#include "dc_motor.h"
+#include "can_control.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -102,9 +105,19 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+  // LED初期化確認
   led_set(LED_COLOR_RED, LED_STATE_ON);
   led_set(LED_COLOR_YELLOW, LED_STATE_ON);
   led_set(LED_COLOR_GREEN, LED_STATE_ON);
+
+  // サーボモーター初期化
+  servo_init(&htim3);
+
+  // DCモーター初期化
+  dc_motor_init(&htim3);
+
+  // CAN受信制御初期化
+  can_control_init(&hcan, &htim3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
