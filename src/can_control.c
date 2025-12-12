@@ -2,6 +2,7 @@
 #include "can_control.h"
 #include "servo.h"
 #include "dc_motor.h"
+#include <stdio.h>
 
 // CAN関連ハンドル
 static CAN_HandleTypeDef *hcan_ctrl = NULL;
@@ -53,6 +54,13 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
   if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rx_header, rx_data) != HAL_OK) {
     return;
   }
+
+  // CAN受信情報を出力
+  printf("CAN RX | ID: 0x%03lX, DLC: %lu, Data: ", rx_header.StdId, rx_header.DLC);
+  for (uint8_t i = 0; i < rx_header.DLC; i++) {
+    printf("%02X ", rx_data[i]);
+  }
+  printf("\n");
 
   // 受信したCAN IDに応じて処理
   switch (rx_header.StdId) {
