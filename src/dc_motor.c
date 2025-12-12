@@ -24,8 +24,9 @@ static TIM_HandleTypeDef *htim_motor = NULL;
 #define MOTOR2_IN2_PORT  GPIOB
 #define MOTOR2_IN2_PIN   GPIO_PIN_7
 
-// TIM3のARR値 (Period = 999, カウント0〜999で1000段階)
-#define TIM3_PERIOD  999
+// TIM3のARR値 (Period = 19999, カウント0〜19999で20000段階)
+// PWM周波数: 50Hz (サーボモーターと共用)
+#define TIM3_PERIOD  19999
 
 void dc_motor_init(TIM_HandleTypeDef *htim) {
   htim_motor = htim;

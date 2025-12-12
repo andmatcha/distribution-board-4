@@ -130,45 +130,8 @@ int main(void)
     /* USER CODE BEGIN 3 */
     // サーボモーター動作確認: 複数の角度を順番に指定
 
-    // 0度
-    servo_set_angle(0);
-    printf("Servo: 0 deg\n");
-    HAL_Delay(1000);
-
-    // 45度
-    servo_set_angle(450);
-    printf("Servo: 45 deg\n");
-    HAL_Delay(1000);
-
-    // 90度 (中央)
-    servo_set_angle(900);
-    printf("Servo: 90 deg\n");
-    HAL_Delay(1000);
-
-    // 135度
-    servo_set_angle(1350);
-    printf("Servo: 135 deg\n");
-    HAL_Delay(1000);
-
-    // 180度
-    servo_set_angle(1800);
-    printf("Servo: 180 deg\n");
-    HAL_Delay(1000);
-
-    // 135度
-    servo_set_angle(1350);
-    printf("Servo: 135 deg\n");
-    HAL_Delay(1000);
-
-    // 90度 (中央)
-    servo_set_angle(900);
-    printf("Servo: 90 deg\n");
-    HAL_Delay(1000);
-
-    // 45度
-    servo_set_angle(450);
-    printf("Servo: 45 deg\n");
-    HAL_Delay(1000);
+    servo_set_angle(300);
+    printf("Servo: 30 deg\n");
   }
   /* USER CODE END 3 */
 }
