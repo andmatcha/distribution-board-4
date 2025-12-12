@@ -39,6 +39,20 @@ void servo_init(TIM_HandleTypeDef *htim) {
   // CCER register check (capture/compare enable register)
   printf("[SERVO_INIT] TIM3 CCER: 0x%04X (bit8 should be 1 for CH3 enable)\n", htim_servo->Instance->CCER);
 
+  // CH3が有効化されていない場合、手動で有効化
+  if (!(htim_servo->Instance->CCER & TIM_CCER_CC3E)) {
+    printf("[SERVO_INIT] WARNING: CH3 not enabled, manually enabling...\n");
+    htim_servo->Instance->CCER |= TIM_CCER_CC3E;
+    printf("[SERVO_INIT] TIM3 CCER after manual enable: 0x%04X\n", htim_servo->Instance->CCER);
+  }
+
+  // カウンターが有効化されていない場合、手動で有効化
+  if (!(htim_servo->Instance->CR1 & TIM_CR1_CEN)) {
+    printf("[SERVO_INIT] WARNING: Counter not enabled, manually enabling...\n");
+    htim_servo->Instance->CR1 |= TIM_CR1_CEN;
+    printf("[SERVO_INIT] TIM3 CR1 after manual enable: 0x%04X\n", htim_servo->Instance->CR1);
+  }
+
   // CCMR2 register check (capture/compare mode register for CH3/CH4)
   printf("[SERVO_INIT] TIM3 CCMR2: 0x%04X (bits 4-6 should be 110 for PWM mode 1 on CH3)\n", htim_servo->Instance->CCMR2);
 

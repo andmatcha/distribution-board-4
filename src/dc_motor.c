@@ -1,5 +1,6 @@
 /* DC motor control implementation */
 #include "dc_motor.h"
+#include <stdio.h>
 
 // DCモーター用タイマーハンドル
 static TIM_HandleTypeDef *htim_motor = NULL;
@@ -31,11 +32,29 @@ static TIM_HandleTypeDef *htim_motor = NULL;
 void dc_motor_init(TIM_HandleTypeDef *htim) {
   htim_motor = htim;
 
+  // TIM3カウンターが既に起動しているか確認
+  uint32_t cr1_before = htim_motor->Instance->CR1;
+  uint32_t ccer_before = htim_motor->Instance->CCER;
+
   // TIM3 CH1 (PB4) - Motor1 IN1 (PWM)
-  HAL_TIM_PWM_Start(htim_motor, TIM_CHANNEL_1);
+  // カウンターは既にサーボ初期化で起動済みの想定
+  // チャンネル出力のみを有効化（CCERレジスタのCC1Eビット）
+  if (!(ccer_before & TIM_CCER_CC1E)) {
+    HAL_TIM_PWM_Start(htim_motor, TIM_CHANNEL_1);
+  }
 
   // TIM3 CH2 (PB5) - Motor2 IN1 (PWM)
-  HAL_TIM_PWM_Start(htim_motor, TIM_CHANNEL_2);
+  if (!(ccer_before & TIM_CCER_CC2E)) {
+    HAL_TIM_PWM_Start(htim_motor, TIM_CHANNEL_2);
+  }
+
+  // デバッグ出力
+  printf("[DC_MOTOR_INIT] TIM3 CR1 before: 0x%04X, after: 0x%04X\n",
+         cr1_before, htim_motor->Instance->CR1);
+  printf("[DC_MOTOR_INIT] TIM3 CCER before: 0x%04X, after: 0x%04X\n",
+         ccer_before, htim_motor->Instance->CCER);
+  printf("[DC_MOTOR_INIT] TIM3 CCR3 (servo): %lu (should not be affected)\n",
+         htim_motor->Instance->CCR3);
 
   // 初期状態: 両モーター停止
   dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_STOP, 0);

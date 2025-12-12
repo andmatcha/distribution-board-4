@@ -145,16 +145,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
     // dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, 50);
     // dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_FORWARD, 50);
-
-    // サーボモーター動作確認: 0度 → 135度 → 270度を繰り返し
-    servo_set_angle(0);
-    HAL_Delay(2000);  // 2秒待機
-
-    servo_set_angle(1350);
-    HAL_Delay(2000);  // 2秒待機
-
-    servo_set_angle(2700);
-    HAL_Delay(2000);  // 2秒待機
+    servo_set_angle(900);
   }
   /* USER CODE END 3 */
 }
