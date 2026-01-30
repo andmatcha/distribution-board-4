@@ -5,21 +5,14 @@
 #include "led.h"
 #include <stdio.h>
 
-// CAN関連ハンドル
+#define DC_SPEED 100  // DCモーター速度 (%)
+
 static CAN_HandleTypeDef *hcan_ctrl = NULL;
 static TIM_HandleTypeDef *htim_ctrl = NULL;
 
-// サーボモーター現在角度 (angle_x10単位: 0〜2700)
-static uint16_t servo_current_angle = 1350;  // 初期値135度
-
-// サーボモーター角度変化量 (angle_x10単位)
-// サーボ速度: 0.14秒で60度 → 428.6度/秒
-// CAN受信間隔: 0.01秒 → 4.29度/受信 ≒ 4度
-#define SERVO_ANGLE_STEP  40  // 4度 (angle_x10単位)
-
-// CANフィルター設定用
 static void can_filter_config(void);
 
+// CAN受信初期化
 void can_control_init(CAN_HandleTypeDef *hcan, TIM_HandleTypeDef *htim) {
   hcan_ctrl = hcan;
   htim_ctrl = htim;
@@ -32,20 +25,15 @@ void can_control_init(CAN_HandleTypeDef *hcan, TIM_HandleTypeDef *htim) {
   HAL_CAN_ActivateNotification(hcan_ctrl, CAN_IT_RX_FIFO0_MSG_PENDING);
 }
 
+// CANフィルター設定
 static void can_filter_config(void) {
   CAN_FilterTypeDef filter_config;
-
-  // フィルター設定: ID 0x208を受信
-  // マスクモードでフィルタリング
-  // ID: 0x208
-  // Mask: 0x7FF (完全一致)
-
   filter_config.FilterBank = 0;
   filter_config.FilterMode = CAN_FILTERMODE_IDMASK;
   filter_config.FilterScale = CAN_FILTERSCALE_32BIT;
-  filter_config.FilterIdHigh = (CAN_ID_CONTROL << 5);  // 標準ID (11bit) を上位にシフト
+  filter_config.FilterIdHigh = (CAN_ID_MOTOR << 5);
   filter_config.FilterIdLow = 0;
-  filter_config.FilterMaskIdHigh = (0x7FF << 5);       // マスク: 完全一致
+  filter_config.FilterMaskIdHigh = (0x7FF << 5);
   filter_config.FilterMaskIdLow = 0;
   filter_config.FilterFIFOAssignment = CAN_RX_FIFO0;
   filter_config.FilterActivation = ENABLE;
@@ -54,6 +42,7 @@ static void can_filter_config(void) {
   HAL_CAN_ConfigFilter(hcan_ctrl, &filter_config);
 }
 
+// CAN受信コールバック
 void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
   led_set(LED_COLOR_YELLOW, LED_STATE_ON);
   CAN_RxHeaderTypeDef rx_header;
@@ -64,65 +53,42 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
     return;
   }
 
-  // 受信したCAN IDに応じて処理
-  if (rx_header.StdId == CAN_ID_CONTROL) {
-    // CAN ID 0x208: モーター制御
+  // モーター駆動
+  if (rx_header.StdId == CAN_ID_MOTOR) {
     // データ: [DCモーター1, DCモーター2, サーボモーター]
     if (rx_header.DLC >= 3) {
-      // DCモーター1制御 (rx_data[0])
+      // DCモーター1
       // 0: 逆転(引っ込む), 1: 正転(出っ張る), それ以外: 無視
       if (rx_data[0] == 0) {
-        dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, 50);
-        printf("DC Motor 1: Reverse (50%%)\n");
+        dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, DC_SPEED);
+        printf("DC Motor 1: Reverse\n");
       } else if (rx_data[0] == 1) {
-        dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_FORWARD, 50);
-        printf("DC Motor 1: Forward (50%%)\n");
+        dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_FORWARD, DC_SPEED);
+        printf("DC Motor 1: Forward\n");
       }
 
-      // DCモーター2制御 (rx_data[1])
+      // DCモーター2
       // 0: 逆転(引っ込む), 1: 正転(出っ張る), それ以外: 無視
       if (rx_data[1] == 0) {
-        dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_REVERSE, 50);
-        printf("DC Motor 2: Reverse (50%%)\n");
+        dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_REVERSE, DC_SPEED);
+        printf("DC Motor 2: Reverse\n");
       } else if (rx_data[1] == 1) {
-        dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_FORWARD, 50);
-        printf("DC Motor 2: Forward (50%%)\n");
+        dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_FORWARD, DC_SPEED);
+        printf("DC Motor 2: Forward\n");
       }
 
-      // サーボモーター制御 (rx_data[2])
-      // 0: 角度を増やす(270度方向), 1: 停止(現在位置保持), 2: 角度を減らす(0度方向)
-      // if (rx_data[2] == 0) {
-      //   // 角度を増やす（270度方向へ）
-      //   if (servo_current_angle < 2700) {
-      //     servo_current_angle += SERVO_ANGLE_STEP;
-      //     if (servo_current_angle > 2700) {
-      //       servo_current_angle = 2700;  // 上限リミット
-      //     }
-      //     servo_set_angle(servo_current_angle);
-      //     printf("Servo: %u.%u deg (increasing)\n", servo_current_angle / 10, servo_current_angle % 10);
-      //   }
-      // } else if (rx_data[2] == 2) {
-      //   // 角度を減らす（0度方向へ）
-      //   if (servo_current_angle > 0) {
-      //     if (servo_current_angle >= SERVO_ANGLE_STEP) {
-      //       servo_current_angle -= SERVO_ANGLE_STEP;
-      //     } else {
-      //       servo_current_angle = 0;  // 下限リミット
-      //     }
-      //     servo_set_angle(servo_current_angle);
-      //     printf("Servo: %u.%u deg (decreasing)\n", servo_current_angle / 10, servo_current_angle % 10);
-      //   }
-      // }
+      // サーボモーター
+      // 0: 角度増加(270度), 1: 現状維持, 2: 角度減少(0度)
       if (rx_data[2] == 0) {
         // 角度を増やす（270度方向へ）
-        printf("[CAN] Before calling servo_set_angle(2700)\n");
-        servo_set_angle(2700);
-        printf("[CAN] After calling servo_set_angle(2700)\n");
+        // servo_set_angle(2700);
+        servo_control(SERVO_DIR_OPEN, SERVO_MODE_NORMAL);
+        printf("Servo Motor: Open Gripper\n");
       } else if (rx_data[2] == 2) {
         // 角度を減らす（0度方向へ）
-        printf("[CAN] Before calling servo_set_angle(0)\n");
-        servo_set_angle(0);
-        printf("[CAN] After calling servo_set_angle(0)\n");
+        // servo_set_angle(0);
+        servo_control(SERVO_DIR_CLOSE, SERVO_MODE_NORMAL);
+        printf("Servo Motor: Close Gripper\n");
       }
       // rx_data[2] == 1 の場合は何もしない（現在位置保持）
     }

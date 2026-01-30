@@ -26,7 +26,7 @@ static TIM_HandleTypeDef *htim_motor = NULL;
 #define MOTOR2_IN2_PIN   GPIO_PIN_7
 
 // TIM3のARR値 (Period = 19999, カウント0〜19999で20000段階)
-// PWM周波数: 50Hz (サーボモーターと共用)
+// PWM周波数: 50Hz
 #define TIM3_PERIOD  19999
 
 void dc_motor_init(TIM_HandleTypeDef *htim) {
@@ -47,14 +47,6 @@ void dc_motor_init(TIM_HandleTypeDef *htim) {
   if (!(ccer_before & TIM_CCER_CC2E)) {
     HAL_TIM_PWM_Start(htim_motor, TIM_CHANNEL_2);
   }
-
-  // デバッグ出力
-  printf("[DC_MOTOR_INIT] TIM3 CR1 before: 0x%04X, after: 0x%04X\n",
-         cr1_before, htim_motor->Instance->CR1);
-  printf("[DC_MOTOR_INIT] TIM3 CCER before: 0x%04X, after: 0x%04X\n",
-         ccer_before, htim_motor->Instance->CCER);
-  printf("[DC_MOTOR_INIT] TIM3 CCR3 (servo): %lu (should not be affected)\n",
-         htim_motor->Instance->CCR3);
 
   // 初期状態: 両モーター停止
   dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_STOP, 0);

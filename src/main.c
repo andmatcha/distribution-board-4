@@ -143,9 +143,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, 50);
-    // dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_FORWARD, 50);
-    servo_set_angle(900);
   }
   /* USER CODE END 3 */
 }
