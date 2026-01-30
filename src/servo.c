@@ -21,6 +21,12 @@ static TIM_HandleTypeDef *htim_servo = NULL;
 
 #define SERVO_MIN_CCR  500   // 0.5ms パルス幅 (0度)
 #define SERVO_MAX_CCR  2500  // 2.5ms パルス幅 (270度)
+#define ANGLE_MIN     0     // 最小角度 (度)
+#define ANGLE_MAX     270   // 最大角度 (度)
+
+uint16_t current_angle = 270; // 初期角度
+
+void servo_set_angle(uint16_t angle);
 
 void servo_init(TIM_HandleTypeDef *htim) {
   htim_servo = htim;
@@ -60,28 +66,30 @@ void servo_init(TIM_HandleTypeDef *htim) {
   printf("[SERVO_INIT] TIM3 CCR3: %lu\n", htim_servo->Instance->CCR3);
 
   // 初期位置: 135度 (中央)
-  servo_set_angle(1350);
+  servo_set_angle(current_angle);
 }
 
-void servo_set_angle(uint16_t angle_x10) {
-  printf("[SERVO] servo_set_angle called: angle_x10=%u\n", angle_x10);
+void servo_set_angle(uint16_t angle) {
+  printf("[SERVO] servo_set_angle called: angle=%u\n", angle);
 
   if (htim_servo == NULL) {
     printf("[SERVO] ERROR: htim_servo is NULL!\n");
     return;
   }
 
-  // 角度範囲チェック (0〜2700)
-  if (angle_x10 > 2700) {
-    angle_x10 = 2700;
+  // 角度範囲チェック (0〜270)
+  if (angle < ANGLE_MIN) {
+    angle = ANGLE_MIN;
+  }
+  if (angle > ANGLE_MAX) {
+    angle = ANGLE_MAX;
   }
 
   // CCR値計算: 角度に応じたデューティ比
-  // angle_x10が0〜2700の範囲を、CCRのSERVO_MIN_CCR〜SERVO_MAX_CCRに変換
-  uint32_t ccr = SERVO_MIN_CCR + ((angle_x10 * (SERVO_MAX_CCR - SERVO_MIN_CCR)) / 2700);
+  // angleが0〜270の範囲を、CCRのSERVO_MIN_CCR〜SERVO_MAX_CCRに変換
+  uint32_t ccr = SERVO_MIN_CCR + ((angle * (SERVO_MAX_CCR - SERVO_MIN_CCR)) / ANGLE_MAX);
 
-  printf("[SERVO] Setting CCR=%lu for angle=%u.%u deg (TIM3->ARR=%lu)\n",
-         ccr, angle_x10 / 10, angle_x10 % 10, htim_servo->Instance->ARR);
+  printf("[SERVO] Setting CCR=%lu for angle=%u deg (TIM3->ARR=%lu)\n", ccr, angle, htim_servo->Instance->ARR);
 
   // CH3のCCR値を設定
   __HAL_TIM_SET_COMPARE(htim_servo, TIM_CHANNEL_3, ccr);
@@ -89,4 +97,24 @@ void servo_set_angle(uint16_t angle_x10) {
   // 設定後の確認
   uint32_t actual_ccr = __HAL_TIM_GET_COMPARE(htim_servo, TIM_CHANNEL_3);
   printf("[SERVO] CCR set to %lu, readback=%lu\n", ccr, actual_ccr);
+}
+
+// サーボモーター制御 呼ばれるたびに角度を少しずつ変化させる
+void servo_control(ServoDirection direction, ServoMode mode) {
+  uint16_t angle_step = (mode == SERVO_MODE_FAST) ? 20 : 10; // 高速モード : 通常モード
+
+  if (direction == SERVO_DIR_OPEN) {
+    current_angle = current_angle + angle_step;
+    if (current_angle > ANGLE_MAX) {
+      current_angle = ANGLE_MAX;
+    }
+  } else {
+    if (current_angle < angle_step) {
+      current_angle = ANGLE_MIN;
+    } else {
+      current_angle = current_angle - angle_step;
+    }
+  }
+
+  servo_set_angle(current_angle);
 }
