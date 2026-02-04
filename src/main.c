@@ -25,6 +25,7 @@
 #include "servo.h"
 #include "dc_motor.h"
 #include "can_control.h"
+#include "encoder.h"
 #include <stdio.h>
 /* USER CODE END Includes */
 
@@ -120,6 +121,10 @@ int main(void)
   // CAN受信制御初期化
   can_control_init(&hcan, &htim3);
 
+  // エンコーダー初期化
+  encoder_init(&huart1);
+  printf("[MAIN] Encoder initialized\n");
+
   // 全初期化完了後のTIM3レジスタ確認
   printf("\n[MAIN] === TIM3 Registers after ALL initializations ===\n");
   printf("[MAIN] TIM3 CR1:   0x%04X (bit0=1 for counter enable)\n", htim3.Instance->CR1);
@@ -143,6 +148,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    // エンコーダーの位置データを要求
+    encoder_request_position();
+
+    // 新しいデータが取得できたらprintfで出力
+    uint16_t position = 0;
+    if (encoder_get_position(&position)) {
+      printf("Encoder: %u\n", position);
+    }
   }
   /* USER CODE END 3 */
 }
