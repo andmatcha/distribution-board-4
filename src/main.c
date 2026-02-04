@@ -143,19 +143,55 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint32_t loop_count = 0;
+  uint32_t last_print_time = 0;
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    loop_count++;
+
+    // 1秒ごとにループカウントとエラー統計を表示
+    uint32_t current_time = HAL_GetTick();
+    if (current_time - last_print_time >= 1000) {
+      printf("\n[MAIN] Loop count: %lu/sec\n", loop_count);
+      printf("[MAIN] UART errors: %lu, Checksum errors: %lu\n",
+             encoder_get_uart_error_count(),
+             encoder_get_checksum_error_count());
+      loop_count = 0;
+      last_print_time = current_time;
+    }
+
     // エンコーダーの位置データを要求
     encoder_request_position();
+
+    // 50ms待機してDMAカウンタを確認
+    HAL_Delay(50);
+
+    // DMAカウンタを確認（データが来ていれば減っているはず）
+    uint32_t dma_remaining = huart1.hdmarx->Instance->CNDTR;
+    printf("[MAIN] After 50ms: DMA CNDTR=%lu (should be <2 if data received)\n", dma_remaining);
+
+    // UART受信データレジスタに何かあるか確認
+    if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_RXNE)) {
+      printf("[MAIN] RXNE flag is SET (data in DR)\n");
+    }
+
+    // オーバーランエラーチェック
+    if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_ORE)) {
+      printf("[MAIN] WARNING: Overrun Error detected!\n");
+    }
 
     // 新しいデータが取得できたらprintfで出力
     uint16_t position = 0;
     if (encoder_get_position(&position)) {
-      printf("Encoder: %u\n", position);
+      printf("[MAIN] Encoder position: %u\n", position);
     }
+
+    // 少し待機
+    HAL_Delay(50);
   }
   /* USER CODE END 3 */
 }
