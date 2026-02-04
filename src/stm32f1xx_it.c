@@ -22,6 +22,7 @@
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "encoder.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -266,6 +267,24 @@ void USART1_IRQHandler(void)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
   // CAN制御モジュールで受信処理
   can_control_rx_callback(hcan);
+}
+
+/**
+ * @brief UART RX完了コールバック
+ * @param huart UARTハンドル
+ */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  // エンコーダーモジュールで受信処理
+  encoder_rx_complete_callback(huart);
+}
+
+/**
+ * @brief UARTエラーコールバック
+ * @param huart UARTハンドル
+ */
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+  // エンコーダーモジュールでエラー処理
+  encoder_error_callback(huart);
 }
 
 /* USER CODE END 1 */
