@@ -13,6 +13,8 @@
 #define ENCODER_BUFFER_SIZE 2
 #define ENCODER_RS485_DE_PIN GPIO_PIN_8
 #define ENCODER_RS485_DE_PORT GPIOA
+#define RS485_TX_EN()   (GPIOA->BSRR = GPIO_PIN_8)
+#define RS485_RX_EN()   (GPIOA->BRR = GPIO_PIN_8)
 
 /* Private variables ---------------------------------------------------------*/
 static UART_HandleTypeDef *encoder_huart = NULL;
@@ -23,27 +25,9 @@ static volatile uint32_t encoder_uart_error_count = 0;
 static volatile uint32_t encoder_checksum_error_count = 0;
 
 /* Private function prototypes -----------------------------------------------*/
-static void encoder_rs485_tx_enable(void);
-static void encoder_rs485_rx_enable(void);
 static bool encoder_decode_position(uint8_t lsb, uint8_t msb, uint16_t *position);
 
 /* Private functions ---------------------------------------------------------*/
-
-/**
- * @brief Enable RS485 transmit mode
- */
-static void encoder_rs485_tx_enable(void)
-{
-  HAL_GPIO_WritePin(ENCODER_RS485_DE_PORT, ENCODER_RS485_DE_PIN, GPIO_PIN_SET);
-}
-
-/**
- * @brief Enable RS485 receive mode
- */
-static void encoder_rs485_rx_enable(void)
-{
-  HAL_GPIO_WritePin(ENCODER_RS485_DE_PORT, ENCODER_RS485_DE_PIN, GPIO_PIN_RESET);
-}
 
 /**
  * @brief Decode encoder position from 2 bytes with checksum validation
@@ -93,7 +77,7 @@ void encoder_init(UART_HandleTypeDef *huart)
   encoder_checksum_error_count = 0;
 
   /* Ensure RX mode */
-  encoder_rs485_rx_enable();
+  RS485_RX_EN();
 }
 
 /**
@@ -101,18 +85,14 @@ void encoder_init(UART_HandleTypeDef *huart)
  */
 void encoder_request_position(void)
 {
-  if (encoder_huart == NULL) {
-    printf("[ENC] ERROR: UART handle is NULL\n");
-    return;
-  }
-
   static uint8_t cmd = ENCODER_CMD;
 
-  encoder_rs485_tx_enable();
+  RS485_TX_EN();
   HAL_UART_Receive_DMA(encoder_huart, encoder_rx_buf, ENCODER_BUFFER_SIZE);
   HAL_UART_Transmit(encoder_huart, &cmd, 1, 10);
   while (__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_TC) == RESET) {}
-  encoder_rs485_rx_enable();
+  RS485_RX_EN();
+  HAL_Delay(10);
 }
 
 /**
@@ -124,15 +104,11 @@ bool encoder_get_position(uint16_t *position)
     return false;
   }
 
-  /* Critical section to prevent data race */
-  __disable_irq();
   if (encoder_data_ready) {
     encoder_data_ready = false;
     *position = encoder_position;
-    __enable_irq();
     return true;
   }
-  __enable_irq();
   return false;
 }
 
@@ -142,28 +118,20 @@ bool encoder_get_position(uint16_t *position)
 void encoder_rx_complete_callback(UART_HandleTypeDef *huart)
 {
   HAL_UART_DMAStop(huart);
+  uint16_t w;
+  if (huart->Instance == encoder_huart->Instance) {
+    w = (encoder_rx_buf[0] | encoder_rx_buf[1] << 8);
 
-  if (huart->Instance != encoder_huart->Instance) {
-    return;
-  }
+    uint16_t cs = 0x3;
+    for (int i = 0; i < 14; i += 2) cs ^= (w >> i) & 0x3;
 
-  printf("[ENC] RX complete: LSB=0x%02X, MSB=0x%02X\n", encoder_rx_buf[0], encoder_rx_buf[1]);
+    if (cs == (w >> 14)) {
+      encoder_position = (w & 0x3FFF);
+    } else {
+      encoder_checksum_error_count++;
+    }
 
-  uint16_t w = (encoder_rx_buf[0] | encoder_rx_buf[1] << 8);
-
-  /* Calculate checksum */
-  uint16_t cs = 0x3;
-  for (int i = 0; i < 14; i += 2) {
-    cs ^= (w >> i) & 0x3;
-  }
-
-  /* Verify checksum */
-  if (cs == (w >> 14)) {
-    encoder_position = (w & 0x3FFF);
     encoder_data_ready = true;
-  } else {
-    /* Invalid checksum - discard data */
-    encoder_checksum_error_count++;
   }
 }
 
@@ -198,7 +166,7 @@ void encoder_error_callback(UART_HandleTypeDef *huart)
   (void)__HAL_UART_FLUSH_DRREGISTER(huart);
 
   /* Ensure RX mode */
-  encoder_rs485_rx_enable();
+  RS485_RX_EN();
 
   /* Additional DR clear */
   if (encoder_huart->Instance->DR) {

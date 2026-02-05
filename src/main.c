@@ -133,11 +133,11 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     encoder_request_position();
-    HAL_Delay(10);
     uint16_t position = 0;
     if (encoder_get_position(&position)) {
-      printf("Encoder position: %u\n", position);
+      printf("Encoder Data: %u\n", position);
     }
+    HAL_Delay(100);
   }
   /* USER CODE END 3 */
 }
