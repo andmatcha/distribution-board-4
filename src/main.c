@@ -132,23 +132,12 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // エンコーダーの位置データを要求
     encoder_request_position();
-
-    // 応答待機
-    HAL_Delay(50);
-
-    // エンコーダーの位置データを取得して出力
+    HAL_Delay(10);
     uint16_t position = 0;
     if (encoder_get_position(&position)) {
       printf("Encoder position: %u\n", position);
-    } else {
-      // エンコーダー読み取りエラー時は赤LED点灯
-      led_set(LED_COLOR_RED, LED_STATE_ON);
     }
-
-    // 待機
-    HAL_Delay(50);
   }
   /* USER CODE END 3 */
 }

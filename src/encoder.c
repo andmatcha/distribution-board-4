@@ -106,70 +106,13 @@ void encoder_request_position(void)
     return;
   }
 
-  /* Check if UART is busy with previous operation */
-  if (encoder_huart->gState != HAL_UART_STATE_READY) {
-    printf("[ENC] UART busy (gState=%d)\n", encoder_huart->gState);
-    return;
-  }
-
   static uint8_t cmd = ENCODER_CMD;
 
-  /* Switch to TX mode and send command */
   encoder_rs485_tx_enable();
-  HAL_Delay(10);
-
-  /* Small delay to ensure DE pin is stable before transmission */
-
-  /* Use non-blocking transmit with timeout */
-  if (HAL_UART_Transmit(encoder_huart, &cmd, 1, 10) != HAL_OK) {
-    printf("[ENC] ERROR: TX failed\n");
-    encoder_uart_error_count++;
-    encoder_rs485_rx_enable();
-    HAL_Delay(10);
-    return;
-  }
-
-  /* Wait for transmission complete with timeout */
-  uint32_t timeout = 1000;
-  while (__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_TC) == RESET) {
-    if (--timeout == 0) {
-      printf("[ENC] ERROR: TX timeout\n");
-      encoder_uart_error_count++;
-      encoder_rs485_rx_enable();
-      return;
-    }
-  }
-
-  /* Immediately switch back to RX mode */
+  HAL_UART_Receive_DMA(encoder_huart, encoder_rx_buf, ENCODER_BUFFER_SIZE);
+  HAL_UART_Transmit(encoder_huart, &cmd, 1, 10);
+  while (__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_TC) == RESET) {}
   encoder_rs485_rx_enable();
-
-  /* Small delay to ensure DE pin is stable before receiving */
-  for (volatile int i = 0; i < 10; i++);
-
-  /* Reset UART RX state to allow new DMA reception */
-  encoder_huart->RxState = HAL_UART_STATE_READY;
-
-  /* Start DMA reception */
-  HAL_StatusTypeDef status = HAL_UART_Receive_DMA(encoder_huart, encoder_rx_buf, ENCODER_BUFFER_SIZE);
-  if (status != HAL_OK) {
-    printf("[ENC] ERROR: DMA RX start failed (status=%d)\n", status);
-    encoder_uart_error_count++;
-  } else {
-    printf("[ENC] Request sent, DMA RX started\n");
-
-    // DMAカウンタの初期値を表示
-    printf("[ENC] DMA CNDTR initial: %lu\n", encoder_huart->hdmarx->Instance->CNDTR);
-
-    // UART状態を表示
-    printf("[ENC] UART RxState: %d, gState: %d\n", encoder_huart->RxState, encoder_huart->gState);
-
-    // UARTレジスタの状態を表示
-    printf("[ENC] USART1 SR: 0x%04lX (RXNE=%d, TC=%d, TXE=%d)\n",
-           encoder_huart->Instance->SR,
-           !!(__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_RXNE)),
-           !!(__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_TC)),
-           !!(__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_TXE)));
-  }
 }
 
 /**
@@ -198,21 +141,29 @@ bool encoder_get_position(uint16_t *position)
  */
 void encoder_rx_complete_callback(UART_HandleTypeDef *huart)
 {
+  HAL_UART_DMAStop(huart);
+
   if (huart->Instance != encoder_huart->Instance) {
     return;
   }
 
   printf("[ENC] RX complete: LSB=0x%02X, MSB=0x%02X\n", encoder_rx_buf[0], encoder_rx_buf[1]);
 
-  uint16_t pos = 0;
-  if (encoder_decode_position(encoder_rx_buf[0], encoder_rx_buf[1], &pos)) {
-    encoder_position = pos;
+  uint16_t w = (encoder_rx_buf[0] | encoder_rx_buf[1] << 8);
+
+  /* Calculate checksum */
+  uint16_t cs = 0x3;
+  for (int i = 0; i < 14; i += 2) {
+    cs ^= (w >> i) & 0x3;
+  }
+
+  /* Verify checksum */
+  if (cs == (w >> 14)) {
+    encoder_position = (w & 0x3FFF);
     encoder_data_ready = true;
-    printf("[ENC] Decoded position: %u (0x%03X)\n", pos, pos);
   } else {
     /* Invalid checksum - discard data */
     encoder_checksum_error_count++;
-    printf("[ENC] ERROR: Checksum failed (total errors: %lu)\n", encoder_checksum_error_count);
   }
 }
 
@@ -227,24 +178,7 @@ void encoder_error_callback(UART_HandleTypeDef *huart)
 
   uint32_t err = HAL_UART_GetError(huart);
   encoder_uart_error_count++;
-
-  printf("[ENC] UART ERROR: 0x%08lX (total errors: %lu)\n", err, encoder_uart_error_count);
-
-  if (err & HAL_UART_ERROR_ORE) {
-    printf("[ENC]   - Overrun Error\n");
-  }
-  if (err & HAL_UART_ERROR_FE) {
-    printf("[ENC]   - Framing Error\n");
-  }
-  if (err & HAL_UART_ERROR_NE) {
-    printf("[ENC]   - Noise Error\n");
-  }
-  if (err & HAL_UART_ERROR_PE) {
-    printf("[ENC]   - Parity Error\n");
-  }
-  if (err & HAL_UART_ERROR_DMA) {
-    printf("[ENC]   - DMA Error\n");
-  }
+  printf("[USART1] Error: 0x%08lX\n", (unsigned long)err);
 
   /* Clear all error flags */
   if (err & HAL_UART_ERROR_ORE) {
@@ -263,11 +197,18 @@ void encoder_error_callback(UART_HandleTypeDef *huart)
   /* Flush data register */
   (void)__HAL_UART_FLUSH_DRREGISTER(huart);
 
-  /* Stop DMA to clear error state */
-  HAL_UART_DMAStop(encoder_huart);
-
   /* Ensure RX mode */
   encoder_rs485_rx_enable();
+
+  /* Additional DR clear */
+  if (encoder_huart->Instance->DR) {
+    (void)encoder_huart->Instance->DR;
+  }
+
+  /* Restart DMA reception */
+  if (HAL_UART_Receive_DMA(encoder_huart, encoder_rx_buf, ENCODER_BUFFER_SIZE) != HAL_OK) {
+    Error_Handler();
+  }
 }
 
 /**
