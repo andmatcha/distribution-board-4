@@ -3,7 +3,6 @@
 #include "servo.h"
 #include "dc_motor.h"
 #include "led.h"
-#include <stdio.h>
 
 #define DC_SPEED 100  // DCモーター速度 (%)
 
@@ -25,18 +24,16 @@ void can_control_init(CAN_HandleTypeDef *hcan, TIM_HandleTypeDef *htim) {
   HAL_CAN_ActivateNotification(hcan_ctrl, CAN_IT_RX_FIFO0_MSG_PENDING);
 }
 
-// CANフィルター設定
+// CANフィルター設定 (0x208, 0x1FFのみ受信)
 static void can_filter_config(void) {
   CAN_FilterTypeDef filter_config;
   filter_config.FilterBank = 0;
-  filter_config.FilterMode = CAN_FILTERMODE_IDLIST;  // リストモードに変更
-  filter_config.FilterScale = CAN_FILTERSCALE_16BIT;  // 16ビットスケールに変更
-  // 16ビットリストモードでは4つのIDを設定可能
-  // 0x208 と 0x1FF を受信
-  filter_config.FilterIdHigh = (CAN_ID_DC << 5);        // 0x208
-  filter_config.FilterIdLow = (CAN_ID_SERVO << 5);      // 0x1FF
-  filter_config.FilterMaskIdHigh = 0;                   // 未使用
-  filter_config.FilterMaskIdLow = 0;                    // 未使用
+  filter_config.FilterMode = CAN_FILTERMODE_IDLIST;
+  filter_config.FilterScale = CAN_FILTERSCALE_16BIT;
+  filter_config.FilterIdHigh = (CAN_ID_DC << 5);
+  filter_config.FilterIdLow = (CAN_ID_SERVO << 5);
+  filter_config.FilterMaskIdHigh = 0;
+  filter_config.FilterMaskIdLow = 0;
   filter_config.FilterFIFOAssignment = CAN_RX_FIFO0;
   filter_config.FilterActivation = ENABLE;
   filter_config.SlaveStartFilterBank = 14;
@@ -63,40 +60,20 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
       return;
     }
 
-    // DCモーター1: キーボードニョッキ
-    // 0: 停止, 1: 出して引く
-    if (rx_data[0] == 0) {
-      // todo 停止処理
-      dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_STOP, 0);
-      printf("DC Motor 1: Stopped\n");
-    } else if (rx_data[0] == 1) {
-      // todo 出して引く処理
+    // DCモーター1: キーボードニョッキ (rx_data[0])
+    if (rx_data[0] == 1) {
       dc_motor_push();
-      printf("DC Motor 1: Pushed Keyboard\n");
+    } else {
+      dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_STOP, 0);
     }
 
-    // DCモーター2: USBニョッキ
-    // 0: 停止, 1: 正転(出っ張る)
-    if (rx_data[3] == 0) {
-      // 停止
-      dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_STOP, 0);
-      printf("DC Motor 2: Stopped\n");
-    } else if (rx_data[3] == 1) {
-      // 正転(出っ張る)
+    // DCモーター2: USBニョッキ (rx_data[3]=正転, rx_data[4]=逆転)
+    if (rx_data[3] == 1) {
       dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_FORWARD, DC_SPEED);
-      printf("DC Motor 2: Forward\n");
-    }
-
-    // DCモーター2: USBニョッキ
-    // 0: 停止, 1: 逆転(引っ込む)
-    if (rx_data[4] == 0) {
-      // 停止
-      dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_STOP, 0);
-      printf("DC Motor 2: Stopped\n");
-    } else if (rx_data[4] == 1 && rx_data[3] != 1) {
-      // 逆転(引っ込む)
+    } else if (rx_data[4] == 1) {
       dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_REVERSE, DC_SPEED);
-      printf("DC Motor 2: Reverse\n");
+    } else {
+      dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_STOP, 0);
     }
   } else if (rx_header.StdId == CAN_ID_SERVO) {
     // 把持サーボモーター (0x1FF)
@@ -105,19 +82,14 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
       return;
     }
 
-    uint16_t data = rx_data[4]<<8 | rx_data[5];
+    // 符号付き整数として解釈
+    int16_t data = (int16_t)(rx_data[4]<<8 | rx_data[5]);
     if (data < 0) {
-      // 把持開く
       servo_control(SERVO_DIR_OPEN, SERVO_MODE_NORMAL);
-      printf("Servo Motor: Open Gripper\n");
     } else if (data == 0) {
-      // 把持停止
       servo_control(SERVO_DIR_STOP, SERVO_MODE_NORMAL);
-      printf("Servo Motor: Stop Gripper\n");
     } else {
-      // 把持閉じる
       servo_control(SERVO_DIR_CLOSE, SERVO_MODE_NORMAL);
-      printf("Servo Motor: Close Gripper\n");
     }
   }
   led_set(LED_COLOR_YELLOW, LED_STATE_OFF);
