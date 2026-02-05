@@ -29,12 +29,14 @@ void can_control_init(CAN_HandleTypeDef *hcan, TIM_HandleTypeDef *htim) {
 static void can_filter_config(void) {
   CAN_FilterTypeDef filter_config;
   filter_config.FilterBank = 0;
-  filter_config.FilterMode = CAN_FILTERMODE_IDMASK;
-  filter_config.FilterScale = CAN_FILTERSCALE_32BIT;
-  filter_config.FilterIdHigh = (CAN_ID_MOTOR << 5);
-  filter_config.FilterIdLow = 0;
-  filter_config.FilterMaskIdHigh = (0x7FF << 5);
-  filter_config.FilterMaskIdLow = 0;
+  filter_config.FilterMode = CAN_FILTERMODE_IDLIST;  // リストモードに変更
+  filter_config.FilterScale = CAN_FILTERSCALE_16BIT;  // 16ビットスケールに変更
+  // 16ビットリストモードでは4つのIDを設定可能
+  // 0x208 と 0x1FF を受信
+  filter_config.FilterIdHigh = (CAN_ID_DC << 5);        // 0x208
+  filter_config.FilterIdLow = (CAN_ID_SERVO << 5);      // 0x1FF
+  filter_config.FilterMaskIdHigh = 0;                   // 未使用
+  filter_config.FilterMaskIdLow = 0;                    // 未使用
   filter_config.FilterFIFOAssignment = CAN_RX_FIFO0;
   filter_config.FilterActivation = ENABLE;
   filter_config.SlaveStartFilterBank = 14;
@@ -53,44 +55,69 @@ void can_control_rx_callback(CAN_HandleTypeDef *hcan) {
     return;
   }
 
-  // モーター駆動
-  if (rx_header.StdId == CAN_ID_MOTOR) {
-    // データ: [DCモーター1, DCモーター2, サーボモーター]
-    if (rx_header.DLC >= 3) {
-      // DCモーター1
-      // 0: 逆転(引っ込む), 1: 正転(出っ張る), それ以外: 無視
-      if (rx_data[0] == 0) {
-        dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, DC_SPEED);
-        printf("DC Motor 1: Reverse\n");
-      } else if (rx_data[0] == 1) {
-        dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_FORWARD, DC_SPEED);
-        printf("DC Motor 1: Forward\n");
-      }
+  // 受信IDによって処理を分岐
+  if (rx_header.StdId == CAN_ID_DC) {
+    // ニョッキDCモーター (0x208)
+    // データ長チェック（rx_data[4]までアクセスするため最低5バイト必要）
+    if (rx_header.DLC < 5) {
+      return;
+    }
 
-      // DCモーター2
-      // 0: 逆転(引っ込む), 1: 正転(出っ張る), それ以外: 無視
-      if (rx_data[1] == 0) {
-        dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_REVERSE, DC_SPEED);
-        printf("DC Motor 2: Reverse\n");
-      } else if (rx_data[1] == 1) {
-        dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_FORWARD, DC_SPEED);
-        printf("DC Motor 2: Forward\n");
-      }
+    // DCモーター1: キーボードニョッキ
+    // 0: 停止, 1: 出して引く
+    if (rx_data[0] == 0) {
+      // todo 停止処理
+      dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_STOP, 0);
+      printf("DC Motor 1: Stopped\n");
+    } else if (rx_data[0] == 1) {
+      // todo 出して引く処理
+      dc_motor_push();
+      printf("DC Motor 1: Pushed Keyboard\n");
+    }
 
-      // サーボモーター
-      // 0: 角度増加(270度), 1: 現状維持, 2: 角度減少(0度)
-      if (rx_data[2] == 0) {
-        // 角度を増やす（270度方向へ）
-        // servo_set_angle(2700);
-        servo_control(SERVO_DIR_OPEN, SERVO_MODE_NORMAL);
-        printf("Servo Motor: Open Gripper\n");
-      } else if (rx_data[2] == 2) {
-        // 角度を減らす（0度方向へ）
-        // servo_set_angle(0);
-        servo_control(SERVO_DIR_CLOSE, SERVO_MODE_NORMAL);
-        printf("Servo Motor: Close Gripper\n");
-      }
-      // rx_data[2] == 1 の場合は何もしない（現在位置保持）
+    // DCモーター2: USBニョッキ
+    // 0: 停止, 1: 正転(出っ張る)
+    if (rx_data[3] == 0) {
+      // 停止
+      dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_STOP, 0);
+      printf("DC Motor 2: Stopped\n");
+    } else if (rx_data[3] == 1) {
+      // 正転(出っ張る)
+      dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_FORWARD, DC_SPEED);
+      printf("DC Motor 2: Forward\n");
+    }
+
+    // DCモーター2: USBニョッキ
+    // 0: 停止, 1: 逆転(引っ込む)
+    if (rx_data[4] == 0) {
+      // 停止
+      dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_STOP, 0);
+      printf("DC Motor 2: Stopped\n");
+    } else if (rx_data[4] == 1 && rx_data[3] != 1) {
+      // 逆転(引っ込む)
+      dc_motor_set(DC_MOTOR_2, DC_MOTOR_DIR_REVERSE, DC_SPEED);
+      printf("DC Motor 2: Reverse\n");
+    }
+  } else if (rx_header.StdId == CAN_ID_SERVO) {
+    // 把持サーボモーター (0x1FF)
+    // データ長チェック（rx_data[5]までアクセスするため最低6バイト必要）
+    if (rx_header.DLC < 6) {
+      return;
+    }
+
+    uint16_t data = rx_data[4]<<8 | rx_data[5];
+    if (data < 0) {
+      // 把持開く
+      servo_control(SERVO_DIR_OPEN, SERVO_MODE_NORMAL);
+      printf("Servo Motor: Open Gripper\n");
+    } else if (data == 0) {
+      // 把持停止
+      servo_control(SERVO_DIR_STOP, SERVO_MODE_NORMAL);
+      printf("Servo Motor: Stop Gripper\n");
+    } else {
+      // 把持閉じる
+      servo_control(SERVO_DIR_CLOSE, SERVO_MODE_NORMAL);
+      printf("Servo Motor: Close Gripper\n");
     }
   }
   led_set(LED_COLOR_YELLOW, LED_STATE_OFF);
