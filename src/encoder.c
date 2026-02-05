@@ -53,10 +53,10 @@ void encoder_request_position(void)
   static uint8_t cmd = ENCODER_CMD;
 
   RS485_TX_EN();
-  HAL_UART_Receive_DMA(encoder_huart, encoder_rx_buf, ENCODER_BUFFER_SIZE);
   HAL_UART_Transmit(encoder_huart, &cmd, 1, 10);
   while (__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_TC) == RESET) {}
   RS485_RX_EN();
+  HAL_UART_Receive_DMA(encoder_huart, encoder_rx_buf, ENCODER_BUFFER_SIZE);
 }
 
 /**
