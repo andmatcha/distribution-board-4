@@ -118,3 +118,21 @@ void dc_motor_set(DcMotorId motor_id, DcMotorDirection direction, uint8_t duty_p
       break;
   }
 }
+
+void dc_motor_push() {
+  // キーボードニョッキ動作: 出っ張る→引っ込む
+  const uint8_t speed = 100;        // モーター速度 (%)
+  const uint32_t push_time = 1000;  // 出っ張る時間 (ms)
+  const uint32_t pull_time = 1000;  // 引っ込む時間 (ms)
+
+  // 正転: 出っ張る
+  dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_FORWARD, speed);
+  HAL_Delay(push_time);
+
+  // 逆転: 引っ込む
+  dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_REVERSE, speed);
+  HAL_Delay(pull_time);
+
+  // 停止
+  dc_motor_set(DC_MOTOR_1, DC_MOTOR_DIR_STOP, 0);
+}
