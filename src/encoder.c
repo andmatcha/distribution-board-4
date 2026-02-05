@@ -24,41 +24,6 @@ static volatile bool encoder_data_ready = false;
 static volatile uint32_t encoder_uart_error_count = 0;
 static volatile uint32_t encoder_checksum_error_count = 0;
 
-/* Private function prototypes -----------------------------------------------*/
-static bool encoder_decode_position(uint8_t lsb, uint8_t msb, uint16_t *position);
-
-/* Private functions ---------------------------------------------------------*/
-
-/**
- * @brief Decode encoder position from 2 bytes with checksum validation
- * @param lsb LSB byte
- * @param msb MSB byte
- * @param position Pointer to store decoded 14-bit position
- * @retval true if checksum is valid, false otherwise
- */
-static bool encoder_decode_position(uint8_t lsb, uint8_t msb, uint16_t *position)
-{
-  if (position == NULL) {
-    return false;
-  }
-
-  uint16_t w = (uint16_t)lsb | ((uint16_t)msb << 8);
-
-  /* Calculate checksum (2-bit) */
-  uint16_t cs = 0x3;
-  for (int i = 0; i < 14; i += 2) {
-    cs ^= (w >> i) & 0x3U;
-  }
-
-  /* Verify checksum */
-  if (cs == (w >> 14)) {
-    *position = (w & 0x3FFFU);
-    return true;
-  }
-
-  return false;
-}
-
 /* Public functions ----------------------------------------------------------*/
 
 /**
@@ -123,7 +88,13 @@ void encoder_rx_complete_callback(UART_HandleTypeDef *huart)
     w = (encoder_rx_buf[0] | encoder_rx_buf[1] << 8);
 
     uint16_t cs = 0x3;
-    for (int i = 0; i < 14; i += 2) cs ^= (w >> i) & 0x3;
+    cs ^= (w >> 0) & 0x3;
+    cs ^= (w >> 2) & 0x3;
+    cs ^= (w >> 4) & 0x3;
+    cs ^= (w >> 6) & 0x3;
+    cs ^= (w >> 8) & 0x3;
+    cs ^= (w >> 10) & 0x3;
+    cs ^= (w >> 12) & 0x3;
 
     if (cs == (w >> 14)) {
       encoder_position = (w & 0x3FFF);
