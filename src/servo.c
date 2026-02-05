@@ -24,7 +24,7 @@ static TIM_HandleTypeDef *htim_servo = NULL;
 #define ANGLE_MIN     0     // 最小角度 (度)
 #define ANGLE_MAX     270   // 最大角度 (度)
 
-uint16_t current_angle = 270; // 初期角度
+uint16_t current_angle = 0; // 初期角度
 
 void servo_set_angle(uint16_t angle);
 
@@ -65,8 +65,28 @@ void servo_init(TIM_HandleTypeDef *htim) {
   // CCR3 register check
   printf("[SERVO_INIT] TIM3 CCR3: %lu\n", htim_servo->Instance->CCR3);
 
-  // 初期位置: 135度 (中央)
+  // 初期位置
   servo_set_angle(current_angle);
+
+  // Force update event to apply CCR changes immediately
+  htim_servo->Instance->EGR = TIM_EGR_UG;
+  printf("[SERVO_INIT] Update event generated\n");
+
+  // Verify CCR3 after update
+  printf("[SERVO_INIT] TIM3 CCR3 after update: %lu\n", htim_servo->Instance->CCR3);
+
+  // Additional register verification
+  printf("[SERVO_INIT] TIM3 CNT (counter): %lu\n", htim_servo->Instance->CNT);
+  printf("[SERVO_INIT] TIM3 SR (status): 0x%04X\n", htim_servo->Instance->SR);
+
+  // GPIO register verification (GPIOB)
+  printf("[SERVO_INIT] GPIOB CRL (config low): 0x%08lX\n", GPIOB->CRL);
+  printf("[SERVO_INIT] GPIOB ODR (output): 0x%04X\n", GPIOB->ODR);
+
+  // AFIO register verification (remap settings)
+  printf("[SERVO_INIT] AFIO MAPR (remap): 0x%08lX\n", AFIO->MAPR);
+  printf("[SERVO_INIT] AFIO MAPR TIM3_REMAP bits (10-11): %lu (should be 2 for partial remap)\n",
+         (AFIO->MAPR >> 10) & 0x3);
 }
 
 void servo_set_angle(uint16_t angle) {
@@ -89,8 +109,6 @@ void servo_set_angle(uint16_t angle) {
   // angleが0〜270の範囲を、CCRのSERVO_MIN_CCR〜SERVO_MAX_CCRに変換
   uint32_t ccr = SERVO_MIN_CCR + ((angle * (SERVO_MAX_CCR - SERVO_MIN_CCR)) / ANGLE_MAX);
 
-  printf("[SERVO] Setting CCR=%lu for angle=%u deg (TIM3->ARR=%lu)\n", ccr, angle, htim_servo->Instance->ARR);
-
   // CH3のCCR値を設定
   __HAL_TIM_SET_COMPARE(htim_servo, TIM_CHANNEL_3, ccr);
 
@@ -101,7 +119,7 @@ void servo_set_angle(uint16_t angle) {
 
 // サーボモーター制御 呼ばれるたびに角度を少しずつ変化させる
 void servo_control(ServoDirection direction, ServoMode mode) {
-  uint16_t angle_step = (mode == SERVO_MODE_FAST) ? 20 : 10; // 高速モード : 通常モード
+  uint16_t angle_step = (mode == SERVO_MODE_FAST) ? 10 : 5; // 高速モード : 通常モード
 
   if (direction == SERVO_DIR_OPEN) {
     current_angle = current_angle + angle_step;
