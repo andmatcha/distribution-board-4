@@ -107,7 +107,6 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  // LED初期化確認
   led_set(LED_COLOR_RED, LED_STATE_OFF);
   led_set(LED_COLOR_YELLOW, LED_STATE_OFF);
   led_set(LED_COLOR_GREEN, LED_STATE_ON);
@@ -123,74 +122,32 @@ int main(void)
 
   // エンコーダー初期化
   encoder_init(&huart1);
-  printf("[MAIN] Encoder initialized\n");
-
-  // 全初期化完了後のTIM3レジスタ確認
-  printf("\n[MAIN] === TIM3 Registers after ALL initializations ===\n");
-  printf("[MAIN] TIM3 CR1:   0x%04X (bit0=1 for counter enable)\n", htim3.Instance->CR1);
-  printf("[MAIN] TIM3 CCER:  0x%04X (bit0=CH1, bit4=CH2, bit8=CH3 enable)\n", htim3.Instance->CCER);
-  printf("[MAIN] TIM3 CCMR1: 0x%04X (CH1/CH2 mode)\n", htim3.Instance->CCMR1);
-  printf("[MAIN] TIM3 CCMR2: 0x%04X (CH3/CH4 mode, bits4-6 should be 0b110 for CH3 PWM mode1)\n", htim3.Instance->CCMR2);
-  printf("[MAIN] TIM3 CCR1:  %lu\n", htim3.Instance->CCR1);
-  printf("[MAIN] TIM3 CCR2:  %lu\n", htim3.Instance->CCR2);
-  printf("[MAIN] TIM3 CCR3:  %lu\n", htim3.Instance->CCR3);
-  printf("[MAIN] TIM3 CNT:   %lu (should be counting if enabled)\n", htim3.Instance->CNT);
-  HAL_Delay(1);
-  printf("[MAIN] TIM3 CNT after 1ms: %lu (should be different if counting)\n", htim3.Instance->CNT);
-  printf("[MAIN] =========================================\n\n");
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint32_t loop_count = 0;
-  uint32_t last_print_time = 0;
-
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    loop_count++;
-
-    // 1秒ごとにループカウントとエラー統計を表示
-    uint32_t current_time = HAL_GetTick();
-    if (current_time - last_print_time >= 1000) {
-      printf("\n[MAIN] Loop count: %lu/sec\n", loop_count);
-      printf("[MAIN] UART errors: %lu, Checksum errors: %lu\n",
-             encoder_get_uart_error_count(),
-             encoder_get_checksum_error_count());
-      loop_count = 0;
-      last_print_time = current_time;
-    }
-
     // エンコーダーの位置データを要求
     encoder_request_position();
 
-    // 50ms待機してDMAカウンタを確認
+    // 応答待機
     HAL_Delay(50);
 
-    // DMAカウンタを確認（データが来ていれば減っているはず）
-    uint32_t dma_remaining = huart1.hdmarx->Instance->CNDTR;
-    printf("[MAIN] After 50ms: DMA CNDTR=%lu (should be <2 if data received)\n", dma_remaining);
-
-    // UART受信データレジスタに何かあるか確認
-    if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_RXNE)) {
-      printf("[MAIN] RXNE flag is SET (data in DR)\n");
-    }
-
-    // オーバーランエラーチェック
-    if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_ORE)) {
-      printf("[MAIN] WARNING: Overrun Error detected!\n");
-    }
-
-    // 新しいデータが取得できたらprintfで出力
+    // エンコーダーの位置データを取得して出力
     uint16_t position = 0;
     if (encoder_get_position(&position)) {
-      printf("[MAIN] Encoder position: %u\n", position);
+      printf("Encoder position: %u\n", position);
+    } else {
+      // エンコーダー読み取りエラー時は赤LED点灯
+      led_set(LED_COLOR_RED, LED_STATE_ON);
     }
 
-    // 少し待機
+    // 待機
     HAL_Delay(50);
   }
   /* USER CODE END 3 */
@@ -436,6 +393,7 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
+  led_set(LED_COLOR_RED, LED_STATE_ON);
   while (1)
   {
   }
