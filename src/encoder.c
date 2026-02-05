@@ -57,7 +57,6 @@ void encoder_request_position(void)
   HAL_UART_Transmit(encoder_huart, &cmd, 1, 10);
   while (__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_TC) == RESET) {}
   RS485_RX_EN();
-  HAL_Delay(10);
 }
 
 /**
