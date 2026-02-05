@@ -32,4 +32,10 @@ void dc_motor_init(TIM_HandleTypeDef *htim);
  */
 void dc_motor_set(DcMotorId motor_id, DcMotorDirection direction, uint8_t duty_percent);
 
+/**
+ * @brief キーボードニョッキ動作 (出っ張る→引っ込む)
+ * DC_MOTOR_1を使用して、正転→逆転の動作を自動で実行
+ */
+void dc_motor_push(void);
+
 #endif /* DC_MOTOR_H */
