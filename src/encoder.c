@@ -119,7 +119,6 @@ void encoder_request_position(void)
   HAL_Delay(10);
 
   /* Small delay to ensure DE pin is stable before transmission */
-  for (volatile int i = 0; i < 10; i++);
 
   /* Use non-blocking transmit with timeout */
   if (HAL_UART_Transmit(encoder_huart, &cmd, 1, 10) != HAL_OK) {
@@ -165,7 +164,7 @@ void encoder_request_position(void)
     printf("[ENC] UART RxState: %d, gState: %d\n", encoder_huart->RxState, encoder_huart->gState);
 
     // UARTレジスタの状態を表示
-    printf("[ENC] USART1 SR: 0x%04X (RXNE=%d, TC=%d, TXE=%d)\n",
+    printf("[ENC] USART1 SR: 0x%04lX (RXNE=%d, TC=%d, TXE=%d)\n",
            encoder_huart->Instance->SR,
            !!(__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_RXNE)),
            !!(__HAL_UART_GET_FLAG(encoder_huart, UART_FLAG_TC)),

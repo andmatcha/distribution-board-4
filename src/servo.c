@@ -108,12 +108,15 @@ void servo_control(ServoDirection direction, ServoMode mode) {
     if (current_angle > ANGLE_MAX) {
       current_angle = ANGLE_MAX;
     }
-  } else {
+  } else if (direction == SERVO_DIR_CLOSE) {
     if (current_angle < angle_step) {
       current_angle = ANGLE_MIN;
     } else {
       current_angle = current_angle - angle_step;
     }
+  } else {
+    // SERVO_DIR_STOP: 現在の角度を保持（何もしない）
+    return;
   }
 
   servo_set_angle(current_angle);

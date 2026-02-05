@@ -6,7 +6,8 @@
 
 typedef enum {
   SERVO_DIR_OPEN = 0,   // サーボ引っ込む
-  SERVO_DIR_CLOSE = 1   // サーボ出っ張る
+  SERVO_DIR_CLOSE = 1,  // サーボ出っ張る
+  SERVO_DIR_STOP = 2    // サーボ停止
 } ServoDirection;
 
 typedef enum {

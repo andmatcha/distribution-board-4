@@ -33,7 +33,6 @@ void dc_motor_init(TIM_HandleTypeDef *htim) {
   htim_motor = htim;
 
   // TIM3カウンターが既に起動しているか確認
-  uint32_t cr1_before = htim_motor->Instance->CR1;
   uint32_t ccer_before = htim_motor->Instance->CCER;
 
   // TIM3 CH1 (PB4) - Motor1 IN1 (PWM)
