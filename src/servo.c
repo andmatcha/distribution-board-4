@@ -42,58 +42,13 @@ void servo_init(TIM_HandleTypeDef *htim) {
   printf("[SERVO_INIT] HAL_TIM_PWM_Start status: %d (0=OK)\n", status);
   printf("[SERVO_INIT] TIM3 CR1 after PWM_Start: 0x%04X (bit0 should be 1 for counter enable)\n", htim_servo->Instance->CR1);
 
-  // CCER register check (capture/compare enable register)
-  printf("[SERVO_INIT] TIM3 CCER: 0x%04X (bit8 should be 1 for CH3 enable)\n", htim_servo->Instance->CCER);
-
-  // CH3が有効化されていない場合、手動で有効化
-  if (!(htim_servo->Instance->CCER & TIM_CCER_CC3E)) {
-    printf("[SERVO_INIT] WARNING: CH3 not enabled, manually enabling...\n");
-    htim_servo->Instance->CCER |= TIM_CCER_CC3E;
-    printf("[SERVO_INIT] TIM3 CCER after manual enable: 0x%04X\n", htim_servo->Instance->CCER);
-  }
-
-  // カウンターが有効化されていない場合、手動で有効化
-  if (!(htim_servo->Instance->CR1 & TIM_CR1_CEN)) {
-    printf("[SERVO_INIT] WARNING: Counter not enabled, manually enabling...\n");
-    htim_servo->Instance->CR1 |= TIM_CR1_CEN;
-    printf("[SERVO_INIT] TIM3 CR1 after manual enable: 0x%04X\n", htim_servo->Instance->CR1);
-  }
-
-  // CCMR2 register check (capture/compare mode register for CH3/CH4)
-  printf("[SERVO_INIT] TIM3 CCMR2: 0x%04X (bits 4-6 should be 110 for PWM mode 1 on CH3)\n", htim_servo->Instance->CCMR2);
-
-  // CCR3 register check
-  printf("[SERVO_INIT] TIM3 CCR3: %lu\n", htim_servo->Instance->CCR3);
-
   // 初期位置
   servo_set_angle(current_angle);
-
-  // Force update event to apply CCR changes immediately
-  htim_servo->Instance->EGR = TIM_EGR_UG;
-  printf("[SERVO_INIT] Update event generated\n");
-
-  // Verify CCR3 after update
-  printf("[SERVO_INIT] TIM3 CCR3 after update: %lu\n", htim_servo->Instance->CCR3);
-
-  // Additional register verification
-  printf("[SERVO_INIT] TIM3 CNT (counter): %lu\n", htim_servo->Instance->CNT);
-  printf("[SERVO_INIT] TIM3 SR (status): 0x%04X\n", htim_servo->Instance->SR);
-
-  // GPIO register verification (GPIOB)
-  printf("[SERVO_INIT] GPIOB CRL (config low): 0x%08lX\n", GPIOB->CRL);
-  printf("[SERVO_INIT] GPIOB ODR (output): 0x%04X\n", GPIOB->ODR);
-
-  // AFIO register verification (remap settings)
-  printf("[SERVO_INIT] AFIO MAPR (remap): 0x%08lX\n", AFIO->MAPR);
-  printf("[SERVO_INIT] AFIO MAPR TIM3_REMAP bits (10-11): %lu (should be 2 for partial remap)\n",
-         (AFIO->MAPR >> 10) & 0x3);
 }
 
 void servo_set_angle(uint16_t angle) {
-  printf("[SERVO] servo_set_angle called: angle=%u\n", angle);
-
   if (htim_servo == NULL) {
-    printf("[SERVO] ERROR: htim_servo is NULL!\n");
+    // printf("[SERVO] ERROR: htim_servo is NULL!\n");
     return;
   }
 
@@ -111,15 +66,11 @@ void servo_set_angle(uint16_t angle) {
 
   // CH3のCCR値を設定
   __HAL_TIM_SET_COMPARE(htim_servo, TIM_CHANNEL_3, ccr);
-
-  // 設定後の確認
-  uint32_t actual_ccr = __HAL_TIM_GET_COMPARE(htim_servo, TIM_CHANNEL_3);
-  printf("[SERVO] CCR set to %lu, readback=%lu\n", ccr, actual_ccr);
 }
 
 // サーボモーター制御 呼ばれるたびに角度を少しずつ変化させる
 void servo_control(ServoDirection direction, ServoMode mode) {
-  uint16_t angle_step = (mode == SERVO_MODE_FAST) ? 10 : 5; // 高速モード : 通常モード
+  uint16_t angle_step = (mode == SERVO_MODE_FAST) ? 10 : 4; // 高速モード : 通常モード
 
   if (direction == SERVO_DIR_OPEN) {
     current_angle = current_angle + angle_step;
