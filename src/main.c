@@ -55,6 +55,9 @@ DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
+static CAN_TxHeaderTypeDef can_tx_header;
+static uint8_t can_tx_data[8];
+static uint32_t can_tx_mailbox;
 
 /* USER CODE END PV */
 
@@ -110,6 +113,17 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  can_tx_header.StdId = 0x304;
+  can_tx_header.ExtId = 0;
+  can_tx_header.IDE = CAN_ID_STD;
+  can_tx_header.RTR = CAN_RTR_DATA;
+  can_tx_header.DLC = 2;
+  can_tx_header.TransmitGlobalTime = DISABLE;
+  for (uint8_t i = 0; i < 8; i++) {
+    can_tx_data[i] = i;
+  }
+
+
   led_set(LED_COLOR_RED, LED_STATE_OFF);
   led_set(LED_COLOR_YELLOW, LED_STATE_OFF);
   led_set(LED_COLOR_GREEN, LED_STATE_ON);
@@ -140,6 +154,10 @@ int main(void)
     // エンコーダー値を取得して表示（必要なときだけ）
     uint16_t position = 0;
     if (encoder_get_position(&position)) {
+      uint16_t pos = position & 0x3FFF;
+      can_tx_data[0] = (uint8_t)(pos & 0xFF);
+      can_tx_data[1] = (uint8_t)((pos >> 8) & 0x3F);
+      (void)HAL_CAN_AddTxMessage(&hcan, &can_tx_header, can_tx_data, &can_tx_mailbox);
       printf("Encoder Data: %u\n", position);
     }
   }
@@ -217,6 +235,10 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN_Init 2 */
+  if (HAL_CAN_Start(&hcan) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
   /* USER CODE END CAN_Init 2 */
 
