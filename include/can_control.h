@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 // CAN ID定義
-#define CAN_ID_ENCODER 0x303U  // エンコーダー値送信
+#define CAN_ID_ENCODER 0x302U  // エンコーダー値送信
 
 /**
  * @brief CAN送信初期化
