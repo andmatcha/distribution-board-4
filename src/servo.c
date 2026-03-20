@@ -4,9 +4,10 @@
 
 // サーボモーター用タイマーハンドル
 static TIM_HandleTypeDef *htim_servo = NULL;
+static const uint32_t servo_channel = TIM_CHANNEL_2;
 
 // サーボPWM周波数: 50Hz (20ms周期)
-// TIM3設定: 32MHz / (prescaler+1) / (period+1) = PWM周波数
+// TIM2設定: 32MHz / (prescaler+1) / (period+1) = PWM周波数
 // 現在の設定: prescaler=31, period=19999 → 32MHz/32/20000 = 50Hz
 //
 // サーボモーター仕様:
@@ -32,15 +33,15 @@ void servo_init(TIM_HandleTypeDef *htim) {
   htim_servo = htim;
 
   printf("[SERVO_INIT] TIM Instance: 0x%08lX\n", (uint32_t)htim->Instance);
-  printf("[SERVO_INIT] TIM3 prescaler: %lu\n", htim->Instance->PSC);
-  printf("[SERVO_INIT] TIM3 ARR: %lu\n", htim->Instance->ARR);
-  printf("[SERVO_INIT] TIM3 CR1: 0x%04X\n", htim->Instance->CR1);
+  printf("[SERVO_INIT] TIM prescaler: %lu\n", htim->Instance->PSC);
+  printf("[SERVO_INIT] TIM ARR: %lu\n", htim->Instance->ARR);
+  printf("[SERVO_INIT] TIM CR1: 0x%04lX\n", htim->Instance->CR1);
 
-  // TIM3 CH3 (PB0)をPWM出力として開始
+  // TIM2 CH2 (PA1)をPWM出力として開始
   // HAL_TIM_PWM_Startはタイマーを自動的に有効化する
-  HAL_StatusTypeDef status = HAL_TIM_PWM_Start(htim_servo, TIM_CHANNEL_3);
+  HAL_StatusTypeDef status = HAL_TIM_PWM_Start(htim_servo, servo_channel);
   printf("[SERVO_INIT] HAL_TIM_PWM_Start status: %d (0=OK)\n", status);
-  printf("[SERVO_INIT] TIM3 CR1 after PWM_Start: 0x%04X (bit0 should be 1 for counter enable)\n", htim_servo->Instance->CR1);
+  printf("[SERVO_INIT] TIM CR1 after PWM_Start: 0x%04lX (bit0 should be 1 for counter enable)\n", htim_servo->Instance->CR1);
 
   // 初期位置
   servo_set_angle(current_angle);
@@ -64,8 +65,18 @@ void servo_set_angle(uint16_t angle) {
   // angleが0〜270の範囲を、CCRのSERVO_MIN_CCR〜SERVO_MAX_CCRに変換
   uint32_t ccr = SERVO_MIN_CCR + ((angle * (SERVO_MAX_CCR - SERVO_MIN_CCR)) / ANGLE_MAX);
 
-  // CH3のCCR値を設定
-  __HAL_TIM_SET_COMPARE(htim_servo, TIM_CHANNEL_3, ccr);
+  // CH2のCCR値を設定
+  __HAL_TIM_SET_COMPARE(htim_servo, servo_channel, ccr);
+
+  uint32_t pulse_width_us = ccr;
+  uint32_t timer_enabled = (htim_servo->Instance->CR1 & TIM_CR1_CEN) ? 1U : 0U;
+  uint32_t channel_enabled = (htim_servo->Instance->CCER & TIM_CCER_CC2E) ? 1U : 0U;
+  printf("[SERVO_PWM] TIM2_CH2 enabled=%lu channel=%lu angle=%u ccr=%lu pulse=%luus\n",
+         timer_enabled,
+         channel_enabled,
+         angle,
+         ccr,
+         pulse_width_us);
 }
 
 // サーボモーター制御 呼ばれるたびに角度を少しずつ変化させる

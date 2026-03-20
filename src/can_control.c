@@ -3,6 +3,7 @@
 #include "servo.h"
 #include "dc_motor.h"
 #include "led.h"
+#include <stdio.h>
 
 #define DC_SPEED 100  // DCモーター速度 (%)
 

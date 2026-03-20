@@ -22,6 +22,7 @@
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "can_control.h"
 #include "encoder.h"
 /* USER CODE END Includes */
 
@@ -42,6 +43,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
+static uint32_t encoder_poll_ticks = 0;
 
 /* USER CODE END PV */
 
@@ -192,6 +194,11 @@ void SysTick_Handler(void)
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
+  encoder_poll_ticks++;
+  if (encoder_poll_ticks >= 10U) {
+    encoder_poll_ticks = 0;
+    encoder_request_position();
+  }
 
   /* USER CODE END SysTick_IRQn 1 */
 }
@@ -274,17 +281,6 @@ void USART1_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
-
-/**
- * @brief TIM2周期経過コールバック
- * @param htim タイマーハンドル
- */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-  if (htim->Instance == TIM2) {
-    // 10msごとにエンコーダー位置をリクエスト
-    encoder_request_position();
-  }
-}
 
 /**
  * @brief CAN FIFO0メッセージ受信コールバック
