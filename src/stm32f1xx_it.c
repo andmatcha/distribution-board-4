@@ -194,6 +194,8 @@ void SysTick_Handler(void)
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
+  can_control_process_tx();
+
   encoder_poll_ticks++;
   if (encoder_poll_ticks >= 10U) {
     encoder_poll_ticks = 0;
