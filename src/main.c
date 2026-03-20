@@ -36,7 +36,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -67,12 +66,10 @@ static void MX_USART1_UART_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 /* USER CODE END 0 */
 
 /**
@@ -138,6 +135,7 @@ int main(void)
     uint16_t position = 0;
     if (encoder_get_position(&position)) {
       printf("Encoder Data: %u\n", position);
+      (void)can_control_enqueue_encoder_position(position);
     }
   }
   /* USER CODE END 3 */
